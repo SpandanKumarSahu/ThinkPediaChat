@@ -44,4 +44,4 @@ UserSchema.methods.verifyPassword=function (password,cb) {
 };
 
 
-module.exports= mongoose.model('Patient',PatientSchema);
+module.exports= mongoose.model('User',UserSchema);
