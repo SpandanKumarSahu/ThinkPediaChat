@@ -3,6 +3,7 @@ var Chat=require('../models/chat');
 var uuid=require('node-uuid');
 var jwt=require('jsonwebtoken');
 var config=require('../config');
+var fs=require('fs');
 
 exports.postUser= function(req,res){
     var user = new User();
@@ -244,4 +245,159 @@ exports.getRoomNumber=function (user, friend, cb) {
         });
 };
 
+
+// Returns the list of files the user has shared with the friend whos phone number has been passed in the body.
+exports.getMyFileList=function(req,res){
+    var user=req.value;
+    var friend=req.body.Phone;
+    var files=[];
+    Chat.findOne({})
+        .where('PersonA').equals(user.Phone)
+        .where('PersonB').equals(friend)
+        .select('RoomNumber')
+        .exec(function (err, room) {
+            if(err) throw err;
+            else if(!room){
+                Chat.findOne({})
+                    .where('PersonB').equals(user.Phone)
+                    .where('PersonA').equals(friend)
+                    .select('RoomNumber')
+                    .exec(function (err, room) {
+                        if(err)
+                            throw (err);
+                        else if(!room){
+                            res.json({
+                                success:"false"
+                            });
+                        }
+                        else{
+                            fs.readdir("uploads/"+room+user.Phone, function(err, items) {
+                                for (var i=0; i<items.length; i++) {
+                                    var file = path + '/' + items[i];
+                                    files.push(file);
+                                }
+                            });
+                        }
+                    });
+            }
+            else{
+                fs.readdir("uploads/"+room+user.Phone, function(err, items) {
+                    for (var i=0; i<items.length; i++) {
+                        var file = path + '/' + items[i];
+                        files.push(file);
+                    }
+                });
+            }
+        })
+    res.json(files);
+};
+
+//Returns the files shared by the user's friend with the user.
+exports.getFriendsFileList=function(req,res){
+    var user=req.value;
+    var friend=req.body.Phone;
+    var files=[];
+    Chat.findOne({})
+        .where('PersonA').equals(user.Phone)
+        .where('PersonB').equals(friend)
+        .select('RoomNumber')
+        .exec(function (err, room) {
+            if(err) throw err;
+            else if(!room){
+                Chat.findOne({})
+                    .where('PersonB').equals(user.Phone)
+                    .where('PersonA').equals(friend)
+                    .select('RoomNumber')
+                    .exec(function (err, room) {
+                        if(err)
+                            throw (err);
+                        else if(!room){
+                            res.json({
+                                success:"false"
+                            });
+                        }
+                        else{
+                            fs.readdir("uploads/"+room+friend, function(err, items) {
+                                for (var i=0; i<items.length; i++) {
+                                    var file = path + '/' + items[i];
+                                    files.push(file);
+                                }
+                            });
+                        }
+                    });
+            }
+            else{
+                fs.readdir("uploads/"+room+friend, function(err, items) {
+                    for (var i=0; i<items.length; i++) {
+                        var file = path + '/' + items[i];
+                        files.push(file);
+                    }
+                });
+            }
+        })
+    res.json(files);
+};
+
+//Returns the files shared in a particular room (a talk between two users).
+exports.getAllFileList=function(req,res){
+    var user=req.value;
+    var friend=req.body.Phone;
+    var files=[];
+    Chat.findOne({})
+        .where('PersonA').equals(user.Phone)
+        .where('PersonB').equals(friend)
+        .select('RoomNumber')
+        .exec(function (err, room) {
+            if(err) throw err;
+            else if(!room){
+                Chat.findOne({})
+                    .where('PersonB').equals(user.Phone)
+                    .where('PersonA').equals(friend)
+                    .select('RoomNumber')
+                    .exec(function (err, room) {
+                        if(err)
+                            throw (err);
+                        else if(!room){
+                            res.json({
+                                success:"false"
+                            });
+                        }
+                        else{
+                            fs.readdir("uploads/"+room+friend, function(err, items) {
+                                for (var i=0; i<items.length; i++) {
+                                    var file = path + '/' + items[i];
+                                    files.push(file);
+                                }
+                            });
+                            fs.readdir("uploads/"+room+user.Phone, function(err, items) {
+                                for (var i=0; i<items.length; i++) {
+                                    var file = path + '/' + items[i];
+                                    files.push(file);
+                                }
+                            });
+                        }
+                    });
+            }
+            else{
+                fs.readdir("uploads/"+room+friend, function(err, items) {
+                    for (var i=0; i<items.length; i++) {
+                        var file = path + '/' + items[i];
+                        files.push(file);
+                    }
+                });
+                fs.readdir("uploads/"+room+user.Phone, function(err, items) {
+                    for (var i=0; i<items.length; i++) {
+                        var file = path + '/' + items[i];
+                        files.push(file);
+                    }
+                });
+            }
+        })
+    res.json(files);
+};
+
+//Give the address of the file you want to view
+exports.getFile=function (req, res) {
+    res.sendFile(req.body.file_path);
+}
 
