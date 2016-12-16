@@ -8,6 +8,9 @@ var passport=require('passport');
 var UserController=require('/controllers/user_controller');
 var io=require('socket.io')(app.HttpServer);
 var socketioJwt=require('socketio-jwt');
+var fs = require("fs");
+var siofu = require("socketio-file-upload");
+
 
 var port= process.env.PORT || 7000;
 app.use(bodyParser.urlencoded({
@@ -17,9 +20,10 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json());
 var router=express.Router();
 
+//Connecting ans setting up.
 mongoose.connect(config.database);
 
-app.listen(port);
+app.use(siofu.router).listen(port);
 app.use('/api/chat',router);
 
 router.get('/',function(req,res){
@@ -59,6 +63,11 @@ UserRouter.use(auth);
 UserRouter.route('/addFriend').post(UserController.addFriend);
 UserRouter.route('/getFriends').post(UserController.getFriends);
 UserRouter.route('/getMyself').get(UserController.getMyself);
+UserRouter.route('/getMyFileList').post(UserController.getMyFileList);
+UserRouter.route('/getFriendsFileList').post(UserController.getFriendsFileList);
+UserRouter.route('/getAllFileList').post(UserController.getAllFileList);
+UserRouter.route('/getFile').post(UserController.getFile);
+
 
 // Authenticate tokens. For how to use client side, refer this site: https://www.npmjs.com/package/socketio-jwt-decoder
 /*
@@ -92,32 +101,50 @@ io.use(socketioJwt.authorize({
 io.sockets.on('connection', function (socket) {
     var user;
     var global_room;
-    if(socket.decoded_token){
+
+    /* Please Please go through this page before writing the front-end code for uploading files and see the client side code.
+    *  https://www.npmjs.com/package/socketio-file-upload
+    * */
+
+    var uploader = new siofu();
+    var upload_str="uploads/";
+    uploader.listen(socket);
+    uploader.on("saved",function () {
+
+    });
+
+    if (socket.decoded_token) {
         //Authentication successful
-        if(connected_users.indexOf(socket.decoded_token.Phone)<0)
-            connected_users.push(socket.decoded_token.Phone,'connected');
-        user=socket.decoded_token;
+        if (connected_users.indexOf(socket.decoded_token.Phone) < 0)
+            connected_users.push(socket.decoded_token.Phone, 'connected');
+        user = socket.decoded_token;
     }
     // Once a client has connected, we expect to get a ping from them saying with which friend they wanna contact.
     // Visit https://gist.github.com/crtr0/2896891 for more info.
 
-    socket.on('room', function(friend){
-       UserController.getRoomNumber(user.Phone,friend,function (room) {
-           global_room=room;
-           socket.join(room);
-       })
+    socket.on('room', function (friend) {
+        UserController.getRoomNumber(user.Phone, friend, function (room) {
+            global_room = room;
+            socket.join(room);
+
+            //Create a directory for storing the uploads
+            upload_str="uploads/"+room+user.Phone;
+            if (!fs.existsSync(dir)){
+                fs.mkdirSync(dir);
+            }
+        })
     });
 
     // Once you are connected to a friend, you can only send to him. To connect to another friend, make a new room request.
 
     socket.on('send_message', function (message) {
-        try{
-            UserController.sendMessage(global_room,message,function (report) {
-                if(!report) {
-                    io.sockets.in(global_room).emit('message',message);
-                    if(socket.sockets.length>1){
-                        UserController.getNewMessages(global_room,function (messages) {
-                            if(!messages){
+        try {
+            UserController.sendMessage(global_room, message, function (report) {
+                if (!report) {
+                    io.sockets.in(global_room).emit('message', message);
+                    if (socket.sockets.length > 1) {
+                        UserController.getNewMessages(global_room, function (messages) {
+                            if (!messages) {
                                 //Do nothing. And please implement the try and catch clauses.
                                 // I wonder why IntelliJ hasn't provided code completion.
                             }
@@ -126,31 +153,30 @@ io.sockets.on('connection', function (socket) {
                     }
                 }
             });
-        } catch (err){
+        } catch (err) {
             //Do something later with the error codes that get caught here.
         }
 
     });
 
-    socket.on('get_new_messages',function () {
-        try{
-            UserController.getNewMessages(global_room,function (messages) {
-                for(var m in messages){
-                    socket.emit('new_message',m);
+    socket.on('get_new_messages', function () {
+        try {
+            UserController.getNewMessages(global_room, function (messages) {
+                for (var m in messages) {
+                    socket.emit('new_message', m);
                 }
             });
-        } catch (err){
+        } catch (err) {
             //Do something with the error.
         }
     });
 
 
     socket.on('disconnect', function () {
-        var index=connected_users.indexOf(user);
-        if(index>-1){
-            connected_users.splice(index,1);
+        var index = connected_users.indexOf(user);
+        if (index > -1) {
+            connected_users.splice(index, 1);
         }
     });
-
 
 });
